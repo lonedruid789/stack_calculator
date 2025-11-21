@@ -63,7 +63,7 @@
 
       <div class="total-box">
         <div class="total-label">Grand Total</div>
-        <div class="total-value" id="grandTotal">0.00</div>
+        <div class="total-value" id="grandTotal">0</div>
       </div>
 
       <div class="table" role="table" aria-label="stack-table">
@@ -90,7 +90,7 @@
         <button id="exportCsv">Export CSV</button>
       </div>
 
-      <p class="note">Empty inputs are treated as 0. Enter decimals (use dot or comma). Row totals and grand total update automatically.</p>
+      <p class="note">These are whole numbers (bags). Empty inputs are treated as 0. Row totals and grand total update automatically.</p>
     </div>
   </div>
 
@@ -99,15 +99,16 @@
     const tbody = document.getElementById('tbody');
     const grandEl = document.getElementById('grandTotal');
 
-    function fmt(n){ return Number.isFinite(n) ? n.toFixed(2) : '0.00'; }
+    function fmtInt(n){ return Number.isFinite(n) ? String(Math.trunc(n)) : '0'; }
 
-    function toNumberRaw(v){
+    function toInteger(v){
       if (v === null || v === undefined) return 0;
       const s = String(v).trim(); if(s === '') return 0;
-      // accept comma as decimal separator
+      // remove any decimals, accept comma or dot but keep integer part
       const norm = s.replace(/,/g, '.');
       const n = parseFloat(norm);
-      return isNaN(n) ? 0 : n;
+      if (isNaN(n)) return 0;
+      return Math.trunc(n);
     }
 
     function createRow(i){
@@ -117,17 +118,23 @@
         <div class="cell index">${i+1}</div>
         <div class="cell inputs">
           <div class="inputs">
-            <input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" data-row="${i}" data-col="a" placeholder="" />
-            <input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" data-row="${i}" data-col="b" placeholder="" />
-            <input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" data-row="${i}" data-col="c" placeholder="" />
-            <input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" data-row="${i}" data-col="d" placeholder="" />
+            <input type="number" inputmode="numeric" step="1" min="0" data-row="${i}" data-col="a" placeholder="0" />
+            <input type="number" inputmode="numeric" step="1" min="0" data-row="${i}" data-col="b" placeholder="0" />
+            <input type="number" inputmode="numeric" step="1" min="0" data-row="${i}" data-col="c" placeholder="0" />
+            <input type="number" inputmode="numeric" step="1" min="0" data-row="${i}" data-col="d" placeholder="0" />
           </div>
         </div>
-        <div class="cell total" style="text-align:right"><span class="row-total" id="row-total-${i}">0.00</span></div>
+        <div class="cell total" style="text-align:right"><span class="row-total" id="row-total-${i}">0</span></div>
       `;
       div.querySelectorAll('input').forEach(inp=>{
+        // sanitize as user types and on blur
         inp.addEventListener('input', onInputChange);
         inp.addEventListener('change', onInputChange);
+        inp.addEventListener('blur', ()=>{
+          inp.value = String(toInteger(inp.value) || '');
+          updateRow(parseInt(inp.getAttribute('data-row')));
+          updateGrandTotal();
+        });
       });
       return div;
     }
@@ -137,32 +144,37 @@
 
     function onInputChange(e){
       const row = parseInt(e.target.getAttribute('data-row'));
+      const raw = e.target.value;
+      if(raw === ''){ updateRow(row); updateGrandTotal(); return; }
+      // immediately sanitize to integer
+      const intVal = toInteger(raw);
+      e.target.value = (intVal === 0 && String(raw).trim()==='') ? '' : String(intVal);
       updateRow(row);
       updateGrandTotal();
     }
 
     function getRowValues(row){
-      const a = toNumberRaw(document.querySelector(`input[data-row='${row}'][data-col='a']`).value);
-      const b = toNumberRaw(document.querySelector(`input[data-row='${row}'][data-col='b']`).value);
-      const c = toNumberRaw(document.querySelector(`input[data-row='${row}'][data-col='c']`).value);
-      const d = toNumberRaw(document.querySelector(`input[data-row='${row}'][data-col='d']`).value);
+      const a = toInteger(document.querySelector(`input[data-row='${row}'][data-col='a']`).value);
+      const b = toInteger(document.querySelector(`input[data-row='${row}'][data-col='b']`).value);
+      const c = toInteger(document.querySelector(`input[data-row='${row}'][data-col='c']`).value);
+      const d = toInteger(document.querySelector(`input[data-row='${row}'][data-col='d']`).value);
       return {a,b,c,d};
     }
 
     function updateRow(row){
       const {a,b,c,d} = getRowValues(row);
       const total = (a * b * c) + d;
-      document.getElementById(`row-total-${row}`).textContent = fmt(total);
+      document.getElementById(`row-total-${row}`).textContent = fmtInt(total);
       return total;
     }
 
     function updateGrandTotal(){
       let sum = 0;
       for(let i=0;i<ROWS;i++){
-        const val = parseFloat(document.getElementById(`row-total-${i}`).textContent) || 0;
+        const val = parseInt(document.getElementById(`row-total-${i}`).textContent) || 0;
         sum += val;
       }
-      grandEl.textContent = fmt(sum);
+      grandEl.textContent = fmtInt(sum);
       return sum;
     }
 
@@ -170,8 +182,8 @@
     document.getElementById('resetBtn').addEventListener('click', ()=>{
       if(!confirm('Reset all inputs to zero?')) return;
       document.querySelectorAll('input').forEach(inp=>inp.value='');
-      for(let i=0;i<ROWS;i++) document.getElementById(`row-total-${i}`).textContent = '0.00';
-      grandEl.textContent = '0.00';
+      for(let i=0;i<ROWS;i++) document.getElementById(`row-total-${i}`).textContent = '0';
+      grandEl.textContent = '0';
     });
 
     // Export CSV
@@ -181,7 +193,7 @@
       for(let i=0;i<ROWS;i++){
         const {a,b,c,d} = getRowValues(i);
         const total = (a*b*c)+d;
-        rows.push([i+1,a,b,c,d, total.toFixed(2)]);
+        rows.push([i+1,a,b,c,d, total]);
       }
       const csv = rows.map(r=>r.map(v=>String(v)).join(',')).join('\n');
       const blob = new Blob([csv], {type:'text/csv'});
