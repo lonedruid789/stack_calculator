@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stack Calculator — 10 Rows</title>
+  <style>
+    :root{--bg:#f6f8fb;--card:#fff;--accent:#0b63d6;--muted:#65748b}
+    body{font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);margin:0;padding:28px}
+    .wrap{max-width:900px;margin:0 auto}
+    .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 6px 20px rgba(10,10,10,0.06)}
+    h1{margin:0 0 12px;font-size:20px}
+    .total-box{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    .total-label{font-size:14px;color:var(--muted)}
+    .total-value{font-size:28px;font-weight:700;color:var(--accent)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid #eef2f7;text-align:center}
+    input[type=number]{width:100%;padding:6px;border-radius:6px;border:1px solid #e6ecf8;text-align:right}
+    .row-total{font-weight:700}
+    .controls{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+    button{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid rgba(11,99,214,0.12)}
+    .note{font-size:13px;color:var(--muted);margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Stack Calculator (up to 10 rows)</h1>
+
+      <div class="total-box">
+        <div class="total-label">Grand Total</div>
+        <div class="total-value" id="grandTotal">0.00</div>
+      </div>
+
+      <table aria-label="stack-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>(A) Input</th>
+            <th>(B) Input</th>
+            <th>(C) Input</th>
+            <th>+ (D) Input</th>
+            <th>Row Total = A×B×C + D</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <!-- rows rendered by JS -->
+        </tbody>
+      </table>
+
+      <div class="controls">
+        <button id="resetBtn" class="ghost">Reset All</button>
+        <button id="exportCsv">Export CSV</button>
+      </div>
+
+      <p class="note">Empty inputs are treated as 0. Values accept decimals. Row totals and grand total update automatically.</p>
+    </div>
+  </div>
+
+  <script>
+    const ROWS = 10;
+    const tbody = document.getElementById('tbody');
+    const grandEl = document.getElementById('grandTotal');
+
+    function fmt(n){ return Number.isFinite(n) ? n.toFixed(2) : '0.00'; }
+
+    function toNumber(v){
+      if (v === null || v === undefined) return 0;
+      const n = parseFloat(String(v).trim());
+      return isNaN(n) ? 0 : n;
+    }
+
+    function createRow(i){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td><input type="number" step="any" inputmode="decimal" data-row="${i}" data-col="a" /></td>
+        <td><input type="number" step="any" inputmode="decimal" data-row="${i}" data-col="b" /></td>
+        <td><input type="number" step="any" inputmode="decimal" data-row="${i}" data-col="c" /></td>
+        <td><input type="number" step="any" inputmode="decimal" data-row="${i}" data-col="d" /></td>
+        <td class="row-total" id="row-total-${i}">0.00</td>
+      `;
+      // add listeners
+      tr.querySelectorAll('input').forEach(inp => {
+        inp.addEventListener('input', onInputChange);
+        inp.addEventListener('change', onInputChange);
+      });
+      return tr;
+    }
+
+    // Build table
+    for(let i=0;i<ROWS;i++) tbody.appendChild(createRow(i));
+
+    function onInputChange(e){
+      const row = parseInt(e.target.getAttribute('data-row'));
+      updateRow(row);
+      updateGrandTotal();
+    }
+
+    function getRowValues(row){
+      const a = toNumber(document.querySelector(`input[data-row='${row}'][data-col='a']`).value);
+      const b = toNumber(document.querySelector(`input[data-row='${row}'][data-col='b']`).value);
+      const c = toNumber(document.querySelector(`input[data-row='${row}'][data-col='c']`).value);
+      const d = toNumber(document.querySelector(`input[data-row='${row}'][data-col='d']`).value);
+      return {a,b,c,d};
+    }
+
+    function updateRow(row){
+      const {a,b,c,d} = getRowValues(row);
+      const total = (a * b * c) + d;
+      document.getElementById(`row-total-${row}`).textContent = fmt(total);
+      return total;
+    }
+
+    function updateGrandTotal(){
+      let sum = 0;
+      for(let i=0;i<ROWS;i++){
+        const val = parseFloat(document.getElementById(`row-total-${i}`).textContent) || 0;
+        sum += val;
+      }
+      grandEl.textContent = fmt(sum);
+      return sum;
+    }
+
+    // Reset
+    document.getElementById('resetBtn').addEventListener('click', ()=>{
+      if(!confirm('Reset all inputs to zero?')) return;
+      document.querySelectorAll('input').forEach(inp=>inp.value='');
+      for(let i=0;i<ROWS;i++) document.getElementById(`row-total-${i}`).textContent = '0.00';
+      grandEl.textContent = '0.00';
+    });
+
+    // Export CSV
+    document.getElementById('exportCsv').addEventListener('click', ()=>{
+      const rows = [];
+      rows.push(['Row','A','B','C','D','Row Total']);
+      for(let i=0;i<ROWS;i++){
+        const {a,b,c,d} = getRowValues(i);
+        const total = (a*b*c)+d;
+        rows.push([i+1,a,b,c,d, total.toFixed(2)]);
+      }
+      const csv = rows.map(r=>r.map(v=>String(v)).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'stack_calculation.csv'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    // Initialize grand total (in case some default values exist)
+    updateGrandTotal();
+  </script>
+</body>
+</html>
