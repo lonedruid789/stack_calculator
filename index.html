@@ -63,7 +63,7 @@
     const tbody = document.getElementById('tbody');
     const grandEl = document.getElementById('grandTotal');
 
-    function fmt(n){ return Number.isFinite(n) ? n.toFixed(2) : '0.00'; }
+    function fmt(n){ return Number.isFinite(n) ? String(n) : '0'; }
 
     function toNumber(v){
       if (v === null || v === undefined) return 0;
