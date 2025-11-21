@@ -6,54 +6,21 @@
   <title>Stack Calculator</title>
   <style>
     :root{--bg:#f6f8fb;--card:#fff;--accent:#0b63d6;--muted:#65748b}
-    *{box-sizing:border-box}
-    body{font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);margin:0;padding:20px}
-    .wrap{max-width:920px;margin:0 auto}
+    body{font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);margin:0;padding:28px}
+    .wrap{max-width:900px;margin:0 auto}
     .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 6px 20px rgba(10,10,10,0.06)}
     h1{margin:0 0 12px;font-size:20px}
     .total-box{display:flex;align-items:center;gap:12px;margin-bottom:12px}
     .total-label{font-size:14px;color:var(--muted)}
     .total-value{font-size:28px;font-weight:700;color:var(--accent)}
-
-    /* Desktop table layout */
-    .table{width:100%;border-collapse:collapse}
-    .thead{display:none} /* we'll show actual header with flex below for accessibility */
-    .row{display:grid;grid-template-columns:40px 1fr 100px;align-items:center;padding:10px 0;border-bottom:1px solid #eef2f7}
-    .row.header{font-weight:700}
-    .cell{padding:0 8px;text-align:center}
-    .index{width:40px;text-align:center}
-    .inputs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-    input[type=number], input[type=text]{width:100%;padding:10px;border-radius:8px;border:1px solid #b0b9c9;background:#fff;text-align:right;font-size:16px}
-    .row-total{font-weight:700;text-align:right}
-
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid #eef2f7;text-align:center}
+    input[type=number]{width:100%;padding:6px;border-radius:6px;border:1px solid #b0b9c9;background:#ffffff;text-align:right;box-sizing:border-box;}
+    .row-total{font-weight:700}
     .controls{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
     button{background:var(--accent);color:#fff;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
     button.ghost{background:transparent;color:var(--accent);border:1px solid rgba(11,99,214,0.12)}
     .note{font-size:13px;color:var(--muted);margin-top:8px}
-
-    /* Responsive: mobile optimized layout */
-    @media (max-width:720px){
-      body{padding:12px}
-      .wrap{padding:0 6px}
-      .total-value{font-size:36px}
-      .row{grid-template-columns:34px 1fr 86px;gap:6px;padding:12px 0}
-      .inputs{grid-template-columns:repeat(4,1fr);gap:6px}
-      input[type=number], input[type=text]{padding:10px;font-size:16px}
-      .controls{justify-content:space-between}
-      .controls button{flex:1}
-      .controls button + button{margin-left:8px}
-    }
-
-    /* Very small screens: stack inputs and labels for best spacing */
-    @media (max-width:420px){
-      .row{grid-template-columns:34px 1fr;grid-auto-rows:auto}
-      .cell.inputs{grid-column:2/3}
-      .cell.total{grid-column:2/3;text-align:right;padding-top:8px}
-      .row.header{display:grid;grid-template-columns:34px 1fr;}
-      .row.header .inputs{display:flex;gap:8px}
-      .row .index{text-align:center}
-    }
-
   </style>
 </head>
 <body>
@@ -63,34 +30,31 @@
 
       <div class="total-box">
         <div class="total-label">Grand Total</div>
-        <div class="total-value" id="grandTotal">0</div>
+        <div class="total-value" id="grandTotal">0.00</div>
       </div>
 
-      <div class="table" role="table" aria-label="stack-table">
-        <div class="row header" role="row">
-          <div class="cell index">#</div>
-          <div class="cell inputs" aria-hidden="true">
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
-              <div style="text-align:center">A</div>
-              <div style="text-align:center">B</div>
-              <div style="text-align:center">C</div>
-              <div style="text-align:center">D</div>
-            </div>
-          </div>
-          <div class="cell" style="text-align:right">Total</div>
-        </div>
-
-        <div id="tbody">
-          <!-- rows injected by JS -->
-        </div>
-      </div>
+      <table aria-label="stack-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>A</th>
+            <th>B</th>
+            <th>C</th>
+            <th>D</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <!-- rows rendered by JS -->
+        </tbody>
+      </table>
 
       <div class="controls">
         <button id="resetBtn" class="ghost">Reset All</button>
         <button id="exportCsv">Export CSV</button>
       </div>
 
-      <p class="note">These are whole numbers (bags). Empty inputs are treated as 0. Row totals and grand total update automatically.</p>
+      <p class="note">Empty inputs are treated as 0. Values accept decimals. Row totals and grand total update automatically.</p>
     </div>
   </div>
 
@@ -99,82 +63,63 @@
     const tbody = document.getElementById('tbody');
     const grandEl = document.getElementById('grandTotal');
 
-    function fmtInt(n){ return Number.isFinite(n) ? String(Math.trunc(n)) : '0'; }
+    function fmt(n){ return Number.isFinite(n) ? n.toFixed(2) : '0.00'; }
 
-    function toInteger(v){
+    function toNumber(v){
       if (v === null || v === undefined) return 0;
-      const s = String(v).trim(); if(s === '') return 0;
-      // remove any decimals, accept comma or dot but keep integer part
-      const norm = s.replace(/,/g, '.');
-      const n = parseFloat(norm);
-      if (isNaN(n)) return 0;
-      return Math.trunc(n);
+      const n = parseFloat(String(v).trim());
+      return isNaN(n) ? 0 : n;
     }
 
     function createRow(i){
-      const div = document.createElement('div');
-      div.className = 'row';
-      div.innerHTML = `
-        <div class="cell index">${i+1}</div>
-        <div class="cell inputs">
-          <div class="inputs">
-            <input type="number" inputmode="numeric" step="1" min="0" data-row="${i}" data-col="a" placeholder="0" />
-            <input type="number" inputmode="numeric" step="1" min="0" data-row="${i}" data-col="b" placeholder="0" />
-            <input type="number" inputmode="numeric" step="1" min="0" data-row="${i}" data-col="c" placeholder="0" />
-            <input type="number" inputmode="numeric" step="1" min="0" data-row="${i}" data-col="d" placeholder="0" />
-          </div>
-        </div>
-        <div class="cell total" style="text-align:right"><span class="row-total" id="row-total-${i}">0</span></div>
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td><input type="number" step="any" inputmode="decimal" data-row="${i}" data-col="a" /></td>
+        <td><input type="number" step="any" inputmode="decimal" data-row="${i}" data-col="b" /></td>
+        <td><input type="number" step="any" inputmode="decimal" data-row="${i}" data-col="c" /></td>
+        <td><input type="number" step="any" inputmode="decimal" data-row="${i}" data-col="d" /></td>
+        <td class="row-total" id="row-total-${i}">0.00</td>
       `;
-      div.querySelectorAll('input').forEach(inp=>{
-        // sanitize as user types and on blur
+      // add listeners
+      tr.querySelectorAll('input').forEach(inp => {
         inp.addEventListener('input', onInputChange);
         inp.addEventListener('change', onInputChange);
-        inp.addEventListener('blur', ()=>{
-          inp.value = String(toInteger(inp.value) || '');
-          updateRow(parseInt(inp.getAttribute('data-row')));
-          updateGrandTotal();
-        });
       });
-      return div;
+      return tr;
     }
 
-    // build rows
+    // Build table
     for(let i=0;i<ROWS;i++) tbody.appendChild(createRow(i));
 
     function onInputChange(e){
       const row = parseInt(e.target.getAttribute('data-row'));
-      const raw = e.target.value;
-      if(raw === ''){ updateRow(row); updateGrandTotal(); return; }
-      // immediately sanitize to integer
-      const intVal = toInteger(raw);
-      e.target.value = (intVal === 0 && String(raw).trim()==='') ? '' : String(intVal);
       updateRow(row);
       updateGrandTotal();
     }
 
     function getRowValues(row){
-      const a = toInteger(document.querySelector(`input[data-row='${row}'][data-col='a']`).value);
-      const b = toInteger(document.querySelector(`input[data-row='${row}'][data-col='b']`).value);
-      const c = toInteger(document.querySelector(`input[data-row='${row}'][data-col='c']`).value);
-      const d = toInteger(document.querySelector(`input[data-row='${row}'][data-col='d']`).value);
+      const a = toNumber(document.querySelector(`input[data-row='${row}'][data-col='a']`).value);
+      const b = toNumber(document.querySelector(`input[data-row='${row}'][data-col='b']`).value);
+      const c = toNumber(document.querySelector(`input[data-row='${row}'][data-col='c']`).value);
+      const d = toNumber(document.querySelector(`input[data-row='${row}'][data-col='d']`).value);
       return {a,b,c,d};
     }
 
     function updateRow(row){
       const {a,b,c,d} = getRowValues(row);
       const total = (a * b * c) + d;
-      document.getElementById(`row-total-${row}`).textContent = fmtInt(total);
+      document.getElementById(`row-total-${row}`).textContent = fmt(total);
       return total;
     }
 
     function updateGrandTotal(){
       let sum = 0;
       for(let i=0;i<ROWS;i++){
-        const val = parseInt(document.getElementById(`row-total-${i}`).textContent) || 0;
+        const val = parseFloat(document.getElementById(`row-total-${i}`).textContent) || 0;
         sum += val;
       }
-      grandEl.textContent = fmtInt(sum);
+      grandEl.textContent = fmt(sum);
       return sum;
     }
 
@@ -182,8 +127,8 @@
     document.getElementById('resetBtn').addEventListener('click', ()=>{
       if(!confirm('Reset all inputs to zero?')) return;
       document.querySelectorAll('input').forEach(inp=>inp.value='');
-      for(let i=0;i<ROWS;i++) document.getElementById(`row-total-${i}`).textContent = '0';
-      grandEl.textContent = '0';
+      for(let i=0;i<ROWS;i++) document.getElementById(`row-total-${i}`).textContent = '0.00';
+      grandEl.textContent = '0.00';
     });
 
     // Export CSV
@@ -193,7 +138,7 @@
       for(let i=0;i<ROWS;i++){
         const {a,b,c,d} = getRowValues(i);
         const total = (a*b*c)+d;
-        rows.push([i+1,a,b,c,d, total]);
+        rows.push([i+1,a,b,c,d, total.toFixed(2)]);
       }
       const csv = rows.map(r=>r.map(v=>String(v)).join(',')).join('\n');
       const blob = new Blob([csv], {type:'text/csv'});
@@ -201,7 +146,7 @@
       const a = document.createElement('a'); a.href = url; a.download = 'stack_calculation.csv'; a.click(); URL.revokeObjectURL(url);
     });
 
-    // initialize
+    // Initialize grand total (in case some default values exist)
     updateGrandTotal();
   </script>
 </body>
